@@ -23,12 +23,12 @@ def set_jobs(filename):
             jobs.append(job_operations)
 
 
-def initialize_individual():
-    individual = []
+def init_chromosome():
+    chromosome = []
     for job_id, job in enumerate(jobs):
-        individual += [job_id] * len(job)
-    random.shuffle(individual)
-    return individual
+        chromosome += [job_id] * len(job)
+    random.shuffle(chromosome)
+    return chromosome
 
 
 def decode(individual):
@@ -60,14 +60,17 @@ def decode(individual):
 
 
 def fitness(individual):
-    makespan, _ = decode(individual)
+    if individual["fitness"] != -1:
+        return individual["fitness"]
+    makespan, _ = decode(individual["chromosome"])
+    individual["fitness"] = makespan
     return makespan
 
 
 def selection(population, k=3):
     selected = random.sample(population, k)
-    selected.sort(key=lambda ind: fitness(ind))
-    return selected[0]
+    best = min(selected, key=lambda ind: fitness(ind))
+    return best
 
 
 def order_crossover(parent1, parent2):
@@ -76,8 +79,8 @@ def order_crossover(parent1, parent2):
     child = [-1] * size
     a, b = sorted(random.sample(range(size), 2))
     child[a:b] = parent1[a:b]
-    for i in range(len(counter)):
-        counter[i] = child.count(i)
+    for i in range(a, b):
+        counter[parent1[i]] += 1
     p2_pointer = 0
     for i in range(size):
         if child[i] == -1:
@@ -95,23 +98,26 @@ def mutate(individual, mutation_rate=0.1):
         individual[i], individual[j] = individual[j], individual[i]
 
 
+# TODO: implementirati elitizam, tj. cuvanje najboljeg pojedinca iz prethodne generacije
 def genetic_algorithm(pop_size=50, generations=300):
-    population = [initialize_individual() for _ in range(pop_size)]
-    best_history = []
+    population = [
+        {"chromosome": init_chromosome(), "fitness": -1} for _ in range(pop_size)
+    ]
+    best_history = [-1] * generations
 
     for gen in range(generations):
-        new_population = []
-        for _ in range(pop_size):
-            parent1 = selection(population)
-            parent2 = selection(population)
+        new_population = [{"chromosome": None, "fitness": -1} for _ in range(pop_size)]
+        for i in range(pop_size):
+            parent1 = selection(population)["chromosome"]
+            parent2 = selection(population)["chromosome"]
 
             child = order_crossover(parent1, parent2)
             mutate(child)
-            new_population.append(child)
+            new_population[i]["chromosome"] = child
 
         population = new_population
         best = min(population, key=lambda ind: fitness(ind))
-        best_history.append(fitness(best))
+        best_history[gen] = fitness(best)
 
         if gen % 50 == 0:
             print(f"Generation {gen}, Best Makespan: {fitness(best)}")
@@ -123,12 +129,8 @@ def genetic_algorithm(pop_size=50, generations=300):
 def plot_gantt(schedule):
     _, ax = plt.subplots()
 
-    colors = ["red", "blue", "green", "orange", "purple"]
-
     for job, machine, start, finish in schedule:
-        ax.barh(
-            machine, finish - start, left=start, color=colors[job], edgecolor="black"
-        )
+        ax.barh(machine, finish - start, left=start, edgecolor="black")
         ax.text(
             start + (finish - start) / 2,
             machine,
@@ -152,14 +154,15 @@ def plot_convergence(history):
     plt.show()
 
 
+# TODO: Zadavanje parametara algoritma preko komandne linije
 def main():
     set_jobs("jobs.txt")
 
     best, history = genetic_algorithm()
 
-    best_makespan, best_schedule = decode(best)
+    best_makespan, best_schedule = decode(best["chromosome"])
 
-    print("\nBest Chromosome:", best)
+    print("\nBest Chromosome:", best["chromosome"])
     print("Best Makespan:", best_makespan)
 
     plot_gantt(best_schedule)
