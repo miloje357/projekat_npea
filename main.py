@@ -1,4 +1,5 @@
 import random
+import argparse
 import matplotlib.pyplot as plt
 
 jobs = []
@@ -13,7 +14,8 @@ def set_jobs(filename):
         num_jobs, num_machines = map(int, first_line.split())
 
         jobs = []
-        for line in f:
+        for _ in range(num_jobs):
+            line = f.readline()
             parts = line.strip().split()
             job_operations = []
             for i in range(0, len(parts), 2):
@@ -67,7 +69,7 @@ def fitness(individual):
     return makespan
 
 
-def selection(population, k=3):
+def selection(population, k):
     selected = random.sample(population, k)
     best = min(selected, key=lambda ind: fitness(ind))
     return best
@@ -92,14 +94,14 @@ def order_crossover(parent1, parent2):
     return child
 
 
-def mutate(individual, mutation_rate=0.1):
+def mutate(individual, mutation_rate):
     if random.random() < mutation_rate:
         i, j = random.sample(range(len(individual)), 2)
         individual[i], individual[j] = individual[j], individual[i]
 
 
 # TODO: implementirati elitizam, tj. cuvanje najboljeg pojedinca iz prethodne generacije
-def genetic_algorithm(pop_size=50, generations=300):
+def genetic_algorithm(pop_size, generations, mutation_rate, tournament_size):
     population = [
         {"chromosome": init_chromosome(), "fitness": -1} for _ in range(pop_size)
     ]
@@ -108,11 +110,11 @@ def genetic_algorithm(pop_size=50, generations=300):
     for gen in range(generations):
         new_population = [{"chromosome": None, "fitness": -1} for _ in range(pop_size)]
         for i in range(pop_size):
-            parent1 = selection(population)["chromosome"]
-            parent2 = selection(population)["chromosome"]
+            parent1 = selection(population, tournament_size)["chromosome"]
+            parent2 = selection(population, tournament_size)["chromosome"]
 
             child = order_crossover(parent1, parent2)
-            mutate(child)
+            mutate(child, mutation_rate)
             new_population[i]["chromosome"] = child
 
         population = new_population
@@ -154,11 +156,32 @@ def plot_convergence(history):
     plt.show()
 
 
-# TODO: Zadavanje parametara algoritma preko komandne linije
 def main():
-    set_jobs("jobs.txt")
+    parser = argparse.ArgumentParser(
+        description="Genetic Algorithm for Job Shop Scheduling"
+    )
+    parser.add_argument(
+        "--jobs_file", type=str, default="jobs.txt", help="Path to the jobs file"
+    )
+    parser.add_argument(
+        "--population_size", type=int, default=50, help="Population size"
+    )
+    parser.add_argument(
+        "--generations", type=int, default=300, help="Number of generations"
+    )
+    parser.add_argument(
+        "--mutation_rate", type=float, default=0.1, help="Mutation rate"
+    )
+    parser.add_argument(
+        "--tournament_size", type=int, default=5, help="Tournament size for selection"
+    )
+    args = parser.parse_args()
 
-    best, history = genetic_algorithm()
+    set_jobs(args.jobs_file)
+
+    best, history = genetic_algorithm(
+        args.population_size, args.generations, args.mutation_rate, args.tournament_size
+    )
 
     best_makespan, best_schedule = decode(best["chromosome"])
 
