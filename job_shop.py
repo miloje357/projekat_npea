@@ -1,6 +1,15 @@
 import random
 import argparse
 import matplotlib.pyplot as plt
+import logging
+
+logging.basicConfig(level=logging.ERROR)
+log = logging.getLogger(__name__)
+
+POP_SIZE = 50
+GENERATIONS = 300
+MUTATION_RATE = 0.1
+TOURNAMENT_SIZE = 5
 
 
 class JobShop:
@@ -97,7 +106,13 @@ class JobShop:
             individual[i], individual[j] = individual[j], individual[i]
 
     # TODO: implementirati elitizam, tj. cuvanje najboljeg pojedinca iz prethodne generacije
-    def solve(self, pop_size, generations, mutation_rate, tournament_size):
+    def solve(
+        self,
+        pop_size=POP_SIZE,
+        generations=GENERATIONS,
+        mutation_rate=MUTATION_RATE,
+        tournament_size=TOURNAMENT_SIZE,
+    ):
         population = [
             {"chromosome": self.init_chromosome(), "fitness": -1}
             for _ in range(pop_size)
@@ -121,7 +136,7 @@ class JobShop:
             best_history[gen] = self.fitness(best)
 
             if gen % 50 == 0:
-                print(f"Generation {gen}, Best Makespan: {self.fitness(best)}")
+                log.debug(f"Generation {gen}, Best Makespan: {self.fitness(best)}")
 
         best_individual = min(population, key=lambda ind: self.fitness(ind))
         return best_individual, best_history
@@ -163,16 +178,19 @@ def main():
         "--jobs_file", type=str, default="jobs.txt", help="Path to the jobs file"
     )
     parser.add_argument(
-        "--population_size", type=int, default=50, help="Population size"
+        "--population_size", type=int, default=POP_SIZE, help="Population size"
     )
     parser.add_argument(
-        "--generations", type=int, default=300, help="Number of generations"
+        "--generations", type=int, default=GENERATIONS, help="Number of generations"
     )
     parser.add_argument(
-        "--mutation_rate", type=float, default=0.1, help="Mutation rate"
+        "--mutation_rate", type=float, default=MUTATION_RATE, help="Mutation rate"
     )
     parser.add_argument(
-        "--tournament_size", type=int, default=5, help="Tournament size for selection"
+        "--tournament_size",
+        type=int,
+        default=TOURNAMENT_SIZE,
+        help="Tournament size for selection",
     )
     args = parser.parse_args()
 
