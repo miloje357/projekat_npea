@@ -121,7 +121,7 @@ class JobShop:
 
         for gen in range(generations):
             new_population = [
-                {"chromosome": None, "fitness": -1} for _ in range(pop_size)
+                {"chromosome": None, "fitness": -1} for _ in range(pop_size-1), best
             ]
             for i in range(pop_size):
                 parent1 = self.selection(population, tournament_size)["chromosome"]
