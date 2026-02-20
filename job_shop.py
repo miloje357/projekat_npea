@@ -1,15 +1,17 @@
 import random
 import argparse
+import heapq
 import matplotlib.pyplot as plt
 import logging
 
 logging.basicConfig(level=logging.ERROR)
 log = logging.getLogger(__name__)
 
-POP_SIZE = 50
-GENERATIONS = 300
-MUTATION_RATE = 0.1
-TOURNAMENT_SIZE = 5
+GENERATIONS = 2000
+POP_SIZE = 150
+KEEP = 30 # elitizam
+TOURNAMENT_SIZE = 50
+MUTATION_RATE = 20
 
 
 class JobShop:
@@ -18,7 +20,6 @@ class JobShop:
         self.num_jobs = 0
         self.num_machines = 0
         self.set_jobs(jobs_file)
-
     def set_jobs(self, filename):
         with open(filename, "r") as f:
             first_line = f.readline().strip()
@@ -41,7 +42,7 @@ class JobShop:
         random.shuffle(chromosome)
         return chromosome
 
-    def decode(self, individual):
+    def decode(self, individual, build_schedule=True):
         machine_available = [0] * self.num_machines
         # belezi u kom trenutku masina zavrsava sa radom
         next_op = [0] * self.num_jobs
@@ -49,7 +50,7 @@ class JobShop:
         job_availabe = [0] * self.num_jobs
         # belezi u kom trenutku se svaki posao zavrsava za svaku operaciju
 
-        schedule = []  # (job, machine, start, finish)
+        schedule = []
 
         for job_id in individual:
             operation = next_op[job_id]
@@ -63,7 +64,8 @@ class JobShop:
             job_availabe[job_id] = finish
             next_op[job_id] += 1
 
-            schedule.append((job_id, machine, start, finish))
+            if build_schedule:
+                schedule.append((job_id, machine, start, finish))
 
         makespan = max(machine_available)
         return makespan, schedule
@@ -71,7 +73,7 @@ class JobShop:
     def fitness(self, individual):
         if individual["fitness"] != -1:
             return individual["fitness"]
-        makespan, _ = self.decode(individual["chromosome"])
+        makespan, _ = self.decode(individual["chromosome"], build_schedule=False)
         individual["fitness"] = makespan
         return makespan
 
@@ -104,39 +106,54 @@ class JobShop:
         if random.random() < mutation_rate:
             i, j = random.sample(range(len(individual)), 2)
             individual[i], individual[j] = individual[j], individual[i]
+    
+    def iterate_mutate(self, individual, mutation_rate):
+        while mutation_rate>1:
+            self.mutate(individual, 1)
+            mutation_rate = mutation_rate % 1
+        self.mutate(individual, mutation_rate)
 
-    # TODO: implementirati elitizam, tj. cuvanje najboljeg pojedinca iz prethodne generacije
     def solve(
         self,
         pop_size=POP_SIZE,
         generations=GENERATIONS,
         mutation_rate=MUTATION_RATE,
         tournament_size=TOURNAMENT_SIZE,
+        keep=KEEP,
     ):
         population = [
             {"chromosome": self.init_chromosome(), "fitness": -1}
             for _ in range(pop_size)
         ]
         best_history = [-1] * generations
-
+        current_keep = keep//3
         for gen in range(generations):
+            kbest = heapq.nsmallest(current_keep, population, key=lambda ind: self.fitness(ind))
             new_population = [
-                {"chromosome": None, "fitness": -1} for _ in range(pop_size-1), best
+                {"chromosome": None, "fitness": -1} for _ in range(pop_size-current_keep)
             ]
-            for i in range(pop_size):
+            # print(kbest,'\n')
+            new_population.extend(kbest)
+            for i in range(pop_size-current_keep):
                 parent1 = self.selection(population, tournament_size)["chromosome"]
                 parent2 = self.selection(population, tournament_size)["chromosome"]
 
                 child = self.order_crossover(parent1, parent2)
-                self.mutate(child, mutation_rate)
+                self.iterate_mutate(child, mutation_rate*(i/(pop_size-current_keep)))
                 new_population[i]["chromosome"] = child
 
             population = new_population
             best = min(population, key=lambda ind: self.fitness(ind))
             best_history[gen] = self.fitness(best)
 
-            if gen % 50 == 0:
-                log.debug(f"Generation {gen}, Best Makespan: {self.fitness(best)}")
+            # if gen % 50 == 0:
+            #     log.debug(f"Generation {gen}, Best Makespan: {self.fitness(best)}")
+            if mutation_rate>2:
+                mutation_rate *= 0.998
+            if current_keep<keep:
+                if random.random()<0.02:
+                    current_keep += 1
+            not gen%20 and print(f"Generation {gen}, Best Makespan: {self.fitness(best)}, Current mutation rate: {mutation_rate}, Currently retaining: {current_keep}")
 
         best_individual = min(population, key=lambda ind: self.fitness(ind))
         return best_individual, best_history
@@ -192,12 +209,18 @@ def main():
         default=TOURNAMENT_SIZE,
         help="Tournament size for selection",
     )
+    parser.add_argument(
+        "--keep",
+        type=int,
+        default=KEEP,
+        help="Number of elite individuals to keep",
+    )
     args = parser.parse_args()
 
     js = JobShop(args.jobs_file)
 
     best, history = js.solve(
-        args.population_size, args.generations, args.mutation_rate, args.tournament_size
+        args.population_size, args.generations, args.mutation_rate, args.tournament_size, args.keep
     )
 
     best_makespan, best_schedule = js.decode(best["chromosome"])

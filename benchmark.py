@@ -7,11 +7,12 @@ def run_benchmark(
     population_size=job_shop.POP_SIZE,
     mutation_rate=job_shop.MUTATION_RATE,
     tournament_size=job_shop.TOURNAMENT_SIZE,
-    runs=10,
+    keep=job_shop.KEEP,
+    runs=1,
 ):
     print(f"Running benchmark on {filename} with {runs} runs...")
     print(
-        f"Generations: {generations}, Population Size: {population_size}, Mutation Rate: {mutation_rate}, Tournament Size: {tournament_size}"
+        f"Generations: {generations}, Population Size: {population_size}, Mutation Rate: {mutation_rate}, Tournament Size: {tournament_size}, Keep: {keep}"
     )
     with open(filename) as f:
         num_jobs, _ = map(int, f.readline().split())
@@ -23,7 +24,7 @@ def run_benchmark(
     js = job_shop.JobShop(filename)
     avg = 0
     for i in range(runs):
-        best, _ = js.solve(generations, population_size, mutation_rate, tournament_size)
+        best, _ = js.solve(population_size, generations, mutation_rate, tournament_size, keep)
         makespan, _ = js.decode(best["chromosome"])
         print(f"Run {i+1}: Makespan = {makespan}")
         avg += makespan
@@ -36,7 +37,7 @@ def run_benchmark(
 def main():
     # TODO: Biranje benchmark-a preko komandne linije
     # TODO: Rezultati u fajl
-    run_benchmark("benchmarks/ft06.txt")
+    run_benchmark("benchmarks/test2.txt")
 
 
 if __name__ == "__main__":
