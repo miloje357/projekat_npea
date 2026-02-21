@@ -1,36 +1,38 @@
 import job_shop
 import argparse
 from datetime import datetime
+from multiprocessing import Pool
 
 
-def run_benchmark(
-    filename,
-    generations=job_shop.GENERATIONS,
-    population_size=job_shop.POP_SIZE,
-    mutation_rate=job_shop.MUTATION_RATE,
-    tournament_size=job_shop.TOURNAMENT_SIZE,
-    keep=job_shop.KEEP,
-    runs=30,
-):
-    print(f"Running benchmark on {filename} with {runs} runs...")
-    print(
-        f"Generations: {generations}, Population Size: {population_size}, Mutation Rate: {mutation_rate}, Tournament Size: {tournament_size}, Keep: {keep}"
+def single_run(i, js, args):
+    best, _ = js.solve(
+        args.population_size,
+        args.generations,
+        args.mutation_rate,
+        args.tournament_size,
+        args.keep,
     )
-    with open(filename) as f:
+    makespan, _ = js.decode(best["chromosome"])
+    print(f"Run {i+1}: Makespan = {makespan}")
+    return makespan
+
+
+def run_benchmark(args, runs=30):
+    print(f"Running benchmark on {args.filename} with {runs} runs...")
+    print(
+        f"Generations: {args.generations}, Population Size: {args.population_size}, Mutation Rate: {args.mutation_rate}, Tournament Size: {args.tournament_size}, Keep: {args.keep}"
+    )
+    with open(args.filename) as f:
         num_jobs, _ = map(int, f.readline().split())
         for _ in range(num_jobs):
             f.readline()
         bks = int(f.readline().strip())
 
-    js = job_shop.JobShop(filename)
+    js = job_shop.JobShop(args.filename)
     solutions = []
-    for i in range(runs):
-        best, _ = js.solve(
-            population_size, generations, mutation_rate, tournament_size, keep
-        )
-        makespan, _ = js.decode(best["chromosome"])
-        print(f"Run {i+1}: Makespan = {makespan}")
-        solutions.append(makespan)
+    with Pool() as pool:
+        results = pool.starmap(single_run, [(i, js, args) for i in range(runs)])
+        solutions.extend(results)
 
     median = sorted(solutions)[runs // 2]
     avg = sum(solutions) / runs
@@ -38,6 +40,7 @@ def run_benchmark(
     worst = max(solutions)
     rpd = (avg - bks) / bks * 100
 
+    # TODO: Dodaj i prosjecno vrijeme izvrsavanja
     print(f"Best Makespan: {best}")
     print(f"Worst Makespan: {worst}")
     print(f"Median Makespan: {median}")
@@ -51,7 +54,7 @@ def run_benchmark(
                 "Ran,Filename,Generations,Population Size,Mutation Rate,Tournament Size,Keep,Best,Worst,Median,Average,BKS,RPD\n"
             )
         datetime_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        csv_line = f"{datetime_str},{filename},{generations},{population_size},{mutation_rate},{tournament_size},{keep},{best},{worst},{median},{avg:.2f},{bks},{rpd:.2f}\n"
+        csv_line = f"{datetime_str},{args.filename},{args.generations},{args.population_size},{args.mutation_rate},{args.tournament_size},{args.keep},{best},{worst},{median},{avg:.2f},{bks},{rpd:.2f}%\n"
         f.write(csv_line)
 
 
@@ -94,14 +97,7 @@ def main():
     )
     args = parser.parse_args()
 
-    run_benchmark(
-        filename=parser.parse_args().filename,
-        generations=args.generations,
-        population_size=args.population_size,
-        mutation_rate=args.mutation_rate,
-        tournament_size=args.tournament_size,
-        keep=args.keep,
-    )
+    run_benchmark(args)
 
 
 if __name__ == "__main__":
