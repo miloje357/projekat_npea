@@ -24,7 +24,9 @@ def run_benchmark(
     js = job_shop.JobShop(filename)
     avg = 0
     for i in range(runs):
-        best, _ = js.solve(population_size, generations, mutation_rate, tournament_size, keep)
+        best, _ = js.solve(
+            population_size, generations, mutation_rate, tournament_size, keep
+        )
         makespan, _ = js.decode(best["chromosome"])
         print(f"Run {i+1}: Makespan = {makespan}")
         avg += makespan
@@ -37,7 +39,7 @@ def run_benchmark(
 def main():
     # TODO: Biranje benchmark-a preko komandne linije
     # TODO: Rezultati u fajl
-    run_benchmark("benchmarks/test2.txt")
+    run_benchmark("benchmarks/ft06.txt", generations=50, runs=100)
 
 
 if __name__ == "__main__":
